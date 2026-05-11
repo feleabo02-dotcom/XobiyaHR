@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-export default {
+const config = {
   development: {
     client: 'mysql2',
     connection: {
@@ -12,11 +12,13 @@ export default {
     },
     migrations: {
       directory: './server/migrations',
-      extension: 'js',
+      extension: 'cjs',
+      loadExtensions: ['.cjs'],
     },
     seeds: {
       directory: './server/seeds',
-      extension: 'js',
+      extension: 'cjs',
+      loadExtensions: ['.cjs'],
     },
   },
   production: {
@@ -29,7 +31,17 @@ export default {
       database: process.env.DB_NAME,
     },
     pool: { min: 2, max: 10 },
-    migrations: { directory: './server/migrations' },
-    seeds: { directory: './server/seeds' },
+    migrations: {
+      directory: './server/migrations',
+      extension: 'cjs',
+      loadExtensions: ['.cjs'],
+    },
+    seeds: {
+      directory: './server/seeds',
+      extension: 'cjs',
+      loadExtensions: ['.cjs'],
+    },
   },
 };
+
+export default config;

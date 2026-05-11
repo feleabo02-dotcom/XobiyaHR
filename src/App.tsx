@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
 import Dashboard from './pages/Dashboard';
+import Ecosystem from './pages/Ecosystem';
 import Workers from './pages/Workers';
 import Positions from './pages/Positions';
 import Absences from './pages/Absences';
@@ -25,7 +26,7 @@ import Assignments from './pages/Assignments';
 import Requisitions from './pages/Requisitions';
 import LoginPage from './pages/LoginPage';
 
-type View = 'dashboard' | 'workers' | 'positions' | 'absences' | 'assignments' | 'requisitions';
+type View = 'dashboard' | 'ecosystem' | 'workers' | 'positions' | 'absences' | 'assignments' | 'requisitions';
 
 function AppContent() {
   const { user, loading, logout } = useAuth();
@@ -46,6 +47,7 @@ function AppContent() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'ecosystem', label: 'ERP Ecosystem', icon: LayoutDashboard },
     { id: 'workers', label: 'Workers', icon: Users },
     { id: 'positions', label: 'Positions', icon: Briefcase },
     { id: 'absences', label: 'Absences', icon: Calendar },
@@ -157,6 +159,7 @@ function AppContent() {
               className="max-w-7xl mx-auto"
             >
               {currentView === 'dashboard' && <Dashboard />}
+              {currentView === 'ecosystem' && <Ecosystem />}
               {currentView === 'workers' && <Workers />}
               {currentView === 'positions' && <Positions />}
               {currentView === 'absences' && <Absences />}

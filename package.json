@@ -11,7 +11,11 @@
     "server:dev": "tsx watch server/index.js",
     "start": "node server/index.js",
     "lint": "tsc --noEmit",
-    "db:init": "node -e \"const mysql = require('mysql2/promise'); const fs = require('fs'); const path = require('path'); (async () => { const conn = await mysql.createConnection({host:process.env.DB_HOST||'localhost',user:process.env.DB_USER||'root',password:process.env.DB_PASSWORD||'',multipleStatements:true}); const sql = fs.readFileSync(path.join(__dirname,'server','schema.sql'),'utf8'); await conn.query(sql); console.log('Database initialized'); await conn.end(); })()\""
+    "db:migrate": "knex migrate:latest --knexfile knexfile.js",
+    "db:rollback": "knex migrate:rollback --knexfile knexfile.js",
+    "db:seed": "knex seed:run --knexfile knexfile.js",
+    "db:setup": "knex migrate:latest --knexfile knexfile.js && knex seed:run --knexfile knexfile.js",
+    "db:reset": "knex migrate:rollback --knexfile knexfile.js --all && knex migrate:latest --knexfile knexfile.js && knex seed:run --knexfile knexfile.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
