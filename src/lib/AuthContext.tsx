@@ -1,39 +1,62 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { api, setToken } from './api';
+
+interface User {
+  id: number;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  role: string;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: () => Promise<void>;
-  logout: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName: string) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const token = localStorage.getItem('xobiya_token');
+    if (token) {
+      api.getMe()
+        .then(setUser)
+        .catch(() => {
+          setToken(null);
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
+    } else {
       setLoading(false);
-    });
-    return unsubscribe;
+    }
   }, []);
 
-  const login = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+  const login = async (email: string, password: string) => {
+    const data = await api.login(email, password);
+    setToken(data.token);
+    setUser(data.user);
   };
 
-  const logout = async () => {
-    await signOut(auth);
+  const register = async (email: string, password: string, displayName: string) => {
+    const data = await api.register(email, password, displayName);
+    setToken(data.token);
+    setUser(data.user);
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

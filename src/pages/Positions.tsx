@@ -1,4 +1,5 @@
-import React from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { api } from '../lib/api';
 import { 
   Plus, 
   Search, 
@@ -8,16 +9,69 @@ import {
   ShieldCheck,
   UserCheck
 } from 'lucide-react';
-import { PositionStatus } from '../types';
 import { cn } from '../lib/utils';
 
+interface Position {
+  id: string;
+  title: string;
+  gradeCode: string;
+  costCenterId: string;
+  department: string;
+  location: string;
+  fte: number;
+  status: string;
+  description: string;
+}
+
+const POSITION_STATUSES = ['filled', 'vacant', 'frozen'] as const;
+
 export default function Positions() {
-  const positions = [
-    { title: 'Senior Software Engineer', dept: 'Engineering', status: PositionStatus.FILLED, grade: 'L5', costCenter: 'TECH-001', location: 'London' },
-    { title: 'Product Manager', dept: 'Growth', status: PositionStatus.VACANT, grade: 'L4', costCenter: 'PROD-002', location: 'New York' },
-    { title: 'Head of People', dept: 'HR', status: PositionStatus.FILLED, grade: 'E1', costCenter: 'CORP-010', location: 'London' },
-    { title: 'Solutions Architect', dept: 'Sales', status: PositionStatus.FROZEN, grade: 'L6', costCenter: 'SALES-044', location: 'Remote' },
-  ];
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => { fetchPositions(); }, []);
+
+  async function fetchPositions() {
+    try {
+      const data = await api.getPositions();
+      setPositions(data);
+    } catch (e) {
+      console.error('Failed to fetch positions:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createPosition(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    try {
+      await api.createPosition({
+        title: formData.get('title') as string,
+        gradeCode: formData.get('gradeCode') as string,
+        costCenterId: formData.get('costCenterId') as string,
+        department: formData.get('department') as string,
+        location: formData.get('location') as string,
+        fte: parseFloat(formData.get('fte') as string) || 1.0,
+        status: formData.get('status') as string,
+        description: formData.get('description') as string,
+      });
+      setShowAddModal(false);
+      fetchPositions();
+    } catch (e) {
+      console.error('Failed to create position:', e);
+    }
+  }
+
+  const filtered = positions.filter(p =>
+    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.costCenterId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.department && p.department.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const vacantCount = positions.filter(p => p.status === 'vacant').length;
 
   return (
     <div className="space-y-6">
@@ -26,26 +80,35 @@ export default function Positions() {
           <h1 className="text-3xl font-bold tracking-tight text-neutral-900">Organizational Structures</h1>
           <p className="text-neutral-500 mt-1">Manage positions, grades, and cost-center allocations.</p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
           <Plus size={18} />
           Create Position
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <SummaryIcon label="Total Positions" value="142" icon={Layers} />
-        <SummaryIcon label="Vacant Seats" value="8" icon={UserCheck} />
-        <SummaryIcon label="FTE Utilization" value="98.2%" icon={ShieldCheck} />
-        <SummaryIcon label="Budget Ceiling" value="$14.2M" icon={DollarSign} />
+        <SummaryIcon label="Total Positions" value={String(positions.length)} icon={Layers} />
+        <SummaryIcon label="Vacant Seats" value={String(vacantCount)} icon={UserCheck} />
+        <SummaryIcon label="Filled Ratio" value={positions.length ? `${Math.round(((positions.length - vacantCount) / positions.length) * 100)}%` : '—'} icon={ShieldCheck} />
+        <SummaryIcon label="Dept Count" value={String(new Set(positions.map(p => p.department).filter(Boolean)).size)} icon={DollarSign} />
       </div>
 
       <div className="card-swiss">
         <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex gap-4">
           <div className="relative flex-1">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
-             <input type="text" placeholder="Search by position title or cost center..." className="input-swiss pl-10" />
+             <input 
+               type="text" 
+               placeholder="Search by position title or cost center..." 
+               className="input-swiss pl-10"
+               value={searchTerm}
+               onChange={e => setSearchTerm(e.target.value)}
+             />
           </div>
         </div>
+        {loading ? (
+          <div className="py-20 text-center text-[10px] font-mono text-slate-400 uppercase">Loading positions...</div>
+        ) : (
         <table className="table-swiss">
            <thead>
              <tr>
@@ -57,24 +120,28 @@ export default function Positions() {
              </tr>
            </thead>
            <tbody>
-             {positions.map((p, i) => (
-               <tr key={i}>
+             {filtered.length === 0 ? (
+               <tr>
+                 <td colSpan={5} className="py-20 text-center text-[10px] font-mono text-slate-400 uppercase">No positions found</td>
+               </tr>
+             ) : filtered.map(p => (
+               <tr key={p.id}>
                  <td>
                    <p className="text-sm font-bold">{p.title}</p>
-                   <p className="text-[10px] text-neutral-400 font-mono mt-0.5">ID: POS-{(i+1).toString().padStart(4, '0')}</p>
+                   <p className="text-[10px] text-neutral-400 font-mono mt-0.5">ID: POS-{p.id.padStart(4, '0')}</p>
                  </td>
                  <td>
-                   <p className="text-xs font-medium">{p.dept}</p>
-                   <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{p.costCenter}</p>
+                   <p className="text-xs font-medium">{p.department || '—'}</p>
+                   <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{p.costCenterId}</p>
                  </td>
                  <td>
-                   <span className="text-[10px] font-mono bg-neutral-100 border border-neutral-200 px-2 py-0.5">{p.grade}</span>
+                   <span className="text-[10px] font-mono bg-neutral-100 border border-neutral-200 px-2 py-0.5">{p.gradeCode || '—'}</span>
                  </td>
                  <td>
                     <span className={cn(
                       "text-[9px] font-bold uppercase tracking-widest px-2 py-1 border",
-                      p.status === PositionStatus.FILLED ? "text-green-600 bg-green-50 border-green-200" :
-                      p.status === PositionStatus.VACANT ? "text-blue-600 bg-blue-50 border-blue-200" :
+                      p.status === 'filled' ? "text-green-600 bg-green-50 border-green-200" :
+                      p.status === 'vacant' ? "text-blue-600 bg-blue-50 border-blue-200" :
                       "text-neutral-400 bg-neutral-50 border-neutral-200"
                     )}>
                       {p.status}
@@ -82,14 +149,72 @@ export default function Positions() {
                  </td>
                  <td>
                    <p className="text-[10px] text-neutral-500 flex items-center gap-1 uppercase tracking-tight font-bold">
-                     <MapPin size={10} /> {p.location}
+                     <MapPin size={10} /> {p.location || 'Remote'}
                    </p>
                  </td>
                </tr>
              ))}
            </tbody>
         </table>
+        )}
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-xl border border-neutral-200 rounded-lg">
+            <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold">Create Position</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-neutral-400 hover:text-neutral-900">
+                <Plus className="rotate-45" size={24} />
+              </button>
+            </div>
+            <form onSubmit={createPosition} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="label-swiss">Position Title</label>
+                  <input name="title" required className="input-swiss" placeholder="Senior Software Engineer" />
+                </div>
+                <div>
+                  <label className="label-swiss">Grade Code</label>
+                  <input name="gradeCode" className="input-swiss" placeholder="L5" />
+                </div>
+                <div>
+                  <label className="label-swiss">Cost Center ID</label>
+                  <input name="costCenterId" required className="input-swiss" placeholder="TECH-001" />
+                </div>
+                <div>
+                  <label className="label-swiss">Department</label>
+                  <input name="department" className="input-swiss" placeholder="Engineering" />
+                </div>
+                <div>
+                  <label className="label-swiss">Location</label>
+                  <input name="location" className="input-swiss" placeholder="London / Remote" />
+                </div>
+                <div>
+                  <label className="label-swiss">FTE</label>
+                  <input name="fte" type="number" step="0.1" min="0" max="1" className="input-swiss" placeholder="1.0" />
+                </div>
+                <div>
+                  <label className="label-swiss">Status</label>
+                  <select name="status" className="input-swiss">
+                    <option value="vacant">Vacant</option>
+                    <option value="filled">Filled</option>
+                    <option value="frozen">Frozen</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="label-swiss">Description</label>
+                  <textarea name="description" className="input-swiss min-h-[60px]" placeholder="Role description..." />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <button type="button" onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" className="btn-primary">Create Position</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

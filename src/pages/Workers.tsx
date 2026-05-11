@@ -1,27 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { Worker, WorkerType, WorkerStatus, OperationType } from '../types';
-import { handleFirestoreError, formatDate, cn } from '../lib/utils';
+import { useEffect, useState, type FormEvent } from 'react';
+import { api } from '../lib/api';
+import { formatDate, cn } from '../lib/utils';
 import { 
   Plus, 
   Search, 
   Filter, 
-  MoreHorizontal, 
   UserPlus,
-  Mail,
-  Building2,
-  Calendar,
-  Trash2,
-  Edit,
   CheckSquare,
   Square,
-  AlertTriangle,
   UserX,
-  RefreshCw
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
+
+interface Worker {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  workerType: string;
+  hireDate: string;
+  status: string;
+  department: string;
+  jobTitle: string;
+  photoUrl?: string;
+}
+
+const WORKER_TYPES = ['employee', 'contractor', 'intern', 'contingent'] as const;
+const WORKER_STATUSES = ['active', 'onboarding', 'offboarding', 'terminated'] as const;
 
 export default function Workers() {
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -31,43 +37,40 @@ export default function Workers() {
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchWorkers();
-  }, []);
+  useEffect(() => { fetchWorkers(); }, []);
 
   async function fetchWorkers() {
     try {
-      const snap = await getDocs(collection(db, 'workers'));
-      setWorkers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Worker)));
+      const data = await api.getWorkers();
+      setWorkers(data);
       setSelectedWorkers(new Set());
     } catch (e) {
-      handleFirestoreError(e, OperationType.LIST, 'workers');
+      console.error('Failed to fetch workers:', e);
     } finally {
       setLoading(false);
     }
   }
 
-  async function addWorker(e: React.FormEvent<HTMLFormElement>) {
+  async function addWorker(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const newWorker = {
       firstName: formData.get('firstName') as string,
       lastName: formData.get('lastName') as string,
       email: formData.get('email') as string,
-      workerType: formData.get('workerType') as WorkerType,
-      status: WorkerStatus.ACTIVE,
+      workerType: formData.get('workerType') as string,
+      status: 'active',
       department: formData.get('department') as string,
       jobTitle: formData.get('jobTitle') as string,
       hireDate: formData.get('hireDate') as string,
-      createdAt: serverTimestamp(),
     };
 
     try {
-      await addDoc(collection(db, 'workers'), newWorker);
+      await api.createWorker(newWorker);
       setShowAddModal(false);
       fetchWorkers();
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, 'workers');
+      console.error('Failed to create worker:', e);
     }
   }
 
@@ -81,51 +84,20 @@ export default function Workers() {
 
   const toggleSelectWorker = (id: string) => {
     const newSelected = new Set(selectedWorkers);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
     setSelectedWorkers(newSelected);
   };
 
-  const handleBulkTerminate = async () => {
-    if (!window.confirm(`Are you sure you want to terminate ${selectedWorkers.size} selected workers? This action is recorded in the audit trail.`)) return;
-    
+  const handleBulkUpdateStatus = async (status: string) => {
     setIsProcessing(true);
     try {
-      const batch = writeBatch(db);
-      selectedWorkers.forEach(id => {
-        const ref = doc(db, 'workers', id);
-        batch.update(ref, { 
-          status: WorkerStatus.TERMINATED,
-          updatedAt: serverTimestamp() 
-        });
-      });
-      await batch.commit();
+      for (const id of selectedWorkers) {
+        await api.updateWorker(id, { status } as any);
+      }
       await fetchWorkers();
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'workers/bulk');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBulkUpdateStatus = async (status: WorkerStatus) => {
-    setIsProcessing(true);
-    try {
-      const batch = writeBatch(db);
-      selectedWorkers.forEach(id => {
-        const ref = doc(db, 'workers', id);
-        batch.update(ref, { 
-          status,
-          updatedAt: serverTimestamp() 
-        });
-      });
-      await batch.commit();
-      await fetchWorkers();
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'workers/bulk');
+      console.error('Bulk update failed:', e);
     } finally {
       setIsProcessing(false);
     }
@@ -134,7 +106,7 @@ export default function Workers() {
   const filteredWorkers = workers.filter(w => 
     `${w.firstName} ${w.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    w.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+    (w.jobTitle && w.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -153,7 +125,6 @@ export default function Workers() {
         </button>
       </div>
 
-      {/* Bulk Actions Bar */}
       <AnimatePresence>
         {selectedWorkers.size > 0 && (
           <motion.div
@@ -170,30 +141,17 @@ export default function Workers() {
             </div>
             <div className="flex items-center gap-2">
               <div className="flex bg-white rounded border border-blue-200 p-0.5">
-                <button 
-                  disabled={isProcessing}
-                  onClick={() => handleBulkUpdateStatus(WorkerStatus.ACTIVE)}
-                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Activate
-                </button>
-                <div className="w-px h-4 bg-slate-200 self-center"></div>
-                <button 
-                  disabled={isProcessing}
-                  onClick={() => handleBulkUpdateStatus(WorkerStatus.OFFBOARDING)}
-                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Offboard
-                </button>
+                {['active', 'onboarding', 'offboarding'].map(s => (
+                  <button
+                    key={s}
+                    disabled={isProcessing}
+                    onClick={() => handleBulkUpdateStatus(s)}
+                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-              <button 
-                disabled={isProcessing}
-                onClick={handleBulkTerminate}
-                className="px-4 py-1.5 bg-red-600 text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                <UserX size={12} />
-                Terminate Selected
-              </button>
               <button 
                 onClick={() => setSelectedWorkers(new Set())}
                 className="p-2 text-slate-400 hover:text-slate-900 transition-colors"
@@ -245,13 +203,13 @@ export default function Workers() {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-20 text-center text-slate-400 font-mono text-[10px] uppercase tracking-widest bg-white">
-                    Decrypting Personnel Vault...
+                    Loading Personnel Records...
                   </td>
                 </tr>
               ) : filteredWorkers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-20 text-center text-slate-400 font-mono text-[10px] uppercase tracking-widest bg-white">
-                    No matching records localized
+                    No matching records found
                   </td>
                 </tr>
               ) : filteredWorkers.map((worker) => (
@@ -279,15 +237,15 @@ export default function Workers() {
                     </div>
                   </td>
                   <td>
-                    <p className="text-xs font-semibold text-slate-700">{worker.jobTitle}</p>
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold mt-0.5">{worker.department}</p>
+                    <p className="text-xs font-semibold text-slate-700">{worker.jobTitle || '—'}</p>
+                    <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold mt-0.5">{worker.department || 'Unassigned'}</p>
                   </td>
                   <td>
                     <span className={cn(
                       "badge-xobiya",
-                      worker.status === WorkerStatus.ACTIVE ? "text-emerald-700 bg-emerald-100" :
-                      worker.status === WorkerStatus.ONBOARDING ? "text-blue-700 bg-blue-100" :
-                      worker.status === WorkerStatus.OFFBOARDING ? "text-amber-700 bg-amber-100" :
+                      worker.status === 'active' ? "text-emerald-700 bg-emerald-100" :
+                      worker.status === 'onboarding' ? "text-blue-700 bg-blue-100" :
+                      worker.status === 'offboarding' ? "text-amber-700 bg-amber-100" :
                       "text-slate-700 bg-slate-100"
                     )}>
                       {worker.status.replace('_', ' ')}
@@ -295,7 +253,7 @@ export default function Workers() {
                   </td>
                   <td>
                     <p className="text-[10px] text-slate-500 font-mono">
-                      {formatDate(worker.hireDate)}
+                      {worker.hireDate ? formatDate(worker.hireDate) : '—'}
                     </p>
                   </td>
                   <td className="text-right px-8">
@@ -313,12 +271,11 @@ export default function Workers() {
         
         <div className="p-4 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
-            Showing {filteredWorkers.length} workers / Total DB Size: {workers.length}
+            Showing {filteredWorkers.length} workers / Total: {workers.length}
           </p>
         </div>
       </div>
 
-      {/* Add Worker Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <motion.div 
@@ -351,33 +308,34 @@ export default function Workers() {
                 <div>
                   <label className="label-swiss">Worker Type</label>
                   <select name="workerType" className="input-swiss">
-                    <option value={WorkerType.EMPLOYEE}>Full-time Employee</option>
-                    <option value={WorkerType.CONTRACTOR}>Contractor</option>
-                    <option value={WorkerType.INTERN}>Intern</option>
+                    <option value="employee">Full-time Employee</option>
+                    <option value="contractor">Contractor</option>
+                    <option value="intern">Intern</option>
+                    <option value="contingent">Contingent</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label-swiss">Department</label>
-                  <input name="department" required className="input-swiss" placeholder="Engineering" />
+                  <input name="department" className="input-swiss" placeholder="Engineering" />
                 </div>
                 <div>
                   <label className="label-swiss">Job Title</label>
-                  <input name="jobTitle" required className="input-swiss" placeholder="Software Architect" />
+                  <input name="jobTitle" className="input-swiss" placeholder="Software Architect" />
                 </div>
               </div>
               <div>
                 <label className="label-swiss">Hire Date</label>
-                <input name="hireDate" type="date" required className="input-swiss" />
+                <input name="hireDate" type="date" className="input-swiss" />
               </div>
               
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowAddModal(false)} className="btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" disabled={isProcessing} className="btn-primary">
-                  {isProcessing ? 'Processing...' : 'Finalize Provisioning'}
+                <button type="submit" className="btn-primary">
+                  Finalize Provisioning
                 </button>
               </div>
             </form>
@@ -387,4 +345,3 @@ export default function Workers() {
     </div>
   );
 }
-

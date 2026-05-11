@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { 
   Users, 
@@ -8,23 +8,27 @@ import {
   LogOut, 
   Menu, 
   X,
-  CreditCard,
   Target,
-  Search
+  Search,
+  Clock,
+  FileText,
+  UserPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
-// Pages
 import Dashboard from './pages/Dashboard';
 import Workers from './pages/Workers';
 import Positions from './pages/Positions';
 import Absences from './pages/Absences';
+import Assignments from './pages/Assignments';
+import Requisitions from './pages/Requisitions';
+import LoginPage from './pages/LoginPage';
 
-type View = 'dashboard' | 'workers' | 'positions' | 'absences';
+type View = 'dashboard' | 'workers' | 'positions' | 'absences' | 'assignments' | 'requisitions';
 
 function AppContent() {
-  const { user, loading, login, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -37,28 +41,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-white p-6">
-        <div className="max-w-md w-full space-y-8 text-center">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-neutral-900 flex items-center justify-center text-white">
-              <Target size={32} />
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-neutral-900 font-sans">xobiya HR</h1>
-          <p className="text-neutral-500 font-sans">Enterprise Resource Planning & Human Capital Management</p>
-          <button
-            onClick={login}
-            className="btn-primary w-full mt-8 flex items-center justify-center gap-2"
-          >
-            Sign in with Enterprise ID
-          </button>
-          <p className="text-[10px] text-neutral-400 font-mono uppercase tracking-widest mt-12">
-            Secure Terminal / v1.0.0
-          </p>
-        </div>
-      </div>
-    );
+    return <LoginPage />;
   }
 
   const navItems = [
@@ -66,11 +49,12 @@ function AppContent() {
     { id: 'workers', label: 'Workers', icon: Users },
     { id: 'positions', label: 'Positions', icon: Briefcase },
     { id: 'absences', label: 'Absences', icon: Calendar },
+    { id: 'assignments', label: 'Assignments', icon: UserPlus },
+    { id: 'requisitions', label: 'Requisitions', icon: FileText },
   ];
 
   return (
     <div className="h-screen flex bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans">
-      {/* Sidebar */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (
           <motion.aside
@@ -107,14 +91,12 @@ function AppContent() {
 
             <div className="mt-auto p-4 border-t border-slate-700/50">
               <div className="flex items-center gap-3 px-3 py-4 mb-2 bg-slate-800/50 rounded-lg">
-                <img 
-                  src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-                  alt="Avatar" 
-                  className="w-8 h-8 rounded-full border border-slate-600"
-                />
+                <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {user.displayName.charAt(0).toUpperCase()}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate text-white">{user.displayName}</p>
-                  <p className="text-[10px] text-slate-400 truncate uppercase tracking-tight">Admin Terminal</p>
+                  <p className="text-[10px] text-slate-400 truncate uppercase tracking-tight">{user.role} Terminal</p>
                 </div>
               </div>
               <button
@@ -129,9 +111,7 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-10">
           <div className="flex items-center gap-4">
             <button 
@@ -166,7 +146,6 @@ function AppContent() {
           </div>
         </header>
 
-        {/* Viewport */}
         <div className="flex-1 overflow-y-auto p-8 lg:p-10 space-y-8 bg-[#F8FAFC]">
           <AnimatePresence mode="wait">
             <motion.div
@@ -181,10 +160,11 @@ function AppContent() {
               {currentView === 'workers' && <Workers />}
               {currentView === 'positions' && <Positions />}
               {currentView === 'absences' && <Absences />}
+              {currentView === 'assignments' && <Assignments />}
+              {currentView === 'requisitions' && <Requisitions />}
             </motion.div>
           </AnimatePresence>
 
-          {/* Footer Status */}
           <footer className="pt-10 flex items-center justify-between border-t border-slate-200 pt-8 mt-12 pb-4">
             <div className="flex gap-4 items-center">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">xobiya.v1.0.ERP</span>
@@ -192,7 +172,7 @@ function AppContent() {
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Environment: Production</span>
             </div>
             <div className="text-[9px] text-slate-400 font-mono">
-              Last Backup: {new Date().toISOString().split('T')[0]} | Secure Handshake
+              Last Sync: {new Date().toISOString().split('T')[0]} | MySQL Cluster
             </div>
           </footer>
         </div>
