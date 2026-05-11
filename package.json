@@ -1,25 +1,30 @@
 {
-  "name": "react-example",
+  "name": "xobiya-hr",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "server": "node server/index.js",
+    "server:dev": "tsx watch server/index.js",
+    "start": "node server/index.js",
+    "lint": "tsc --noEmit",
+    "db:init": "node -e \"const mysql = require('mysql2/promise'); const fs = require('fs'); const path = require('path'); (async () => { const conn = await mysql.createConnection({host:process.env.DB_HOST||'localhost',user:process.env.DB_USER||'root',password:process.env.DB_PASSWORD||'',multipleStatements:true}); const sql = fs.readFileSync(path.join(__dirname,'server','schema.sql'),'utf8'); await conn.query(sql); console.log('Database initialized'); await conn.end(); })()\""
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "firebase": "^12.13.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.38.0",
+    "mysql2": "^3.12.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.8.1",
@@ -29,10 +34,8 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "typescript": "~5.8.2"
   }
 }
