@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F8FAFC] text-slate-800 antialiased;
+  }
+}
+
+@layer components {
+  .card-swiss {
+    @apply bg-white border border-slate-200 rounded-lg shadow-sm p-6;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all shadow-sm font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-md hover:bg-slate-50 transition-all shadow-sm font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .input-swiss {
+    @apply border border-slate-200 bg-slate-50 px-3 py-2 rounded-md focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all w-full text-sm placeholder:text-slate-400;
+  }
+
+  .label-swiss {
+    @apply block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2;
+  }
+
+  .table-swiss {
+    @apply w-full text-left border-collapse;
+  }
+
+  .table-swiss th {
+    @apply bg-slate-50 border-b border-slate-100 px-5 py-3 text-[10px] uppercase tracking-widest font-bold text-slate-400;
+  }
+
+  .table-swiss td {
+    @apply border-b border-slate-100 px-5 py-4 align-middle text-sm text-slate-600;
+  }
+
+  .table-swiss tr:hover td {
+    @apply bg-slate-50/50;
+  }
+
+  .badge-xobiya {
+    @apply px-2 py-0.5 rounded-full font-bold uppercase text-[9px] tracking-tight;
+  }
+}

@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Role helpers
+    function isHR() {
+      // In a real app, this would check a 'roles' collection or similar.
+      // For this MVP, we'll allow the user who created certain root configs or by email.
+      return isSignedIn(); // Placeholder for actual HR role check
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidWorker(data) {
+      return data.keys().hasAll(['firstName', 'lastName', 'email', 'workerType', 'status'])
+        && data.firstName is string && data.firstName.size() <= 100
+        && data.lastName is string && data.lastName.size() <= 100
+        && data.email is string && data.email.size() <= 200
+        && data.workerType in ['employee', 'contractor', 'intern', 'contingent']
+        && data.status in ['active', 'onboarding', 'offboarding', 'terminated'];
+    }
+
+    function isValidPosition(data) {
+      return data.keys().hasAll(['title', 'costCenterId', 'status'])
+        && data.title is string && data.title.size() <= 200
+        && data.costCenterId is string && data.costCenterId.size() <= 50
+        && data.status in ['filled', 'vacant', 'frozen'];
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll(['workerId', 'positionId', 'startDate'])
+        && isValidId(data.workerId)
+        && isValidId(data.positionId)
+        && data.startDate is string;
+    }
+
+    function isValidAbsence(data) {
+      return data.keys().hasAll(['workerId', 'type', 'startDate', 'endDate', 'status'])
+        && isValidId(data.workerId)
+        && data.type in ['vacation', 'sick', 'personal', 'maternity', 'other']
+        && data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    // --- Collection Rules ---
+
+    match /workers/{workerId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidWorker(incoming());
+      allow update: if isSignedIn() && isValidWorker(incoming()) && (
+        // Self update limited fields
+        (isOwner(workerId) && incoming().diff(existing()).affectedKeys().hasOnly(['firstName', 'lastName'])) ||
+        // HR update all
+        isHR()
+      );
+      allow delete: if isHR();
+    }
+
+    match /positions/{positionId} {
+      allow read: if isSignedIn();
+      allow write: if isHR() && isValidPosition(incoming());
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isHR() && isValidAssignment(incoming());
+    }
+
+    match /absences/{absenceId} {
+      allow get: if isSignedIn() && (isOwner(existing().workerId) || isHR());
+      allow list: if isSignedIn(); // Queries filtered by workerId in client
+      allow create: if isSignedIn() && incoming().workerId == request.auth.uid && isValidAbsence(incoming());
+      allow update: if isSignedIn() && (
+        // Cancel own
+        (isOwner(existing().workerId) && incoming().status == 'cancelled' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        // HR approve/reject
+        (isHR() && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+    }
+
+    match /timesheets/{timesheetId} {
+      allow read: if isSignedIn() && (isOwner(existing().workerId) || isHR());
+      allow create: if isSignedIn() && incoming().workerId == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(existing().workerId);
+    }
+
+    match /requisitions/{reqId} {
+      allow read: if isSignedIn();
+      allow write: if isHR();
+    }
+  }
+}

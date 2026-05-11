@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "Worker": {
+      "title": "Worker",
+      "description": "Core profile for an employee or contractor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "workerType": { "type": "string", "enum": ["employee", "contractor", "intern", "contingent"] },
+        "hireDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["active", "onboarding", "offboarding", "terminated"] },
+        "department": { "type": "string" },
+        "jobTitle": { "type": "string" }
+      },
+      "required": ["firstName", "lastName", "email", "workerType", "status"]
+    },
+    "Position": {
+      "title": "Position",
+      "description": "A seat within the organization with an associated budget.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "gradeCode": { "type": "string" },
+        "costCenterId": { "type": "string" },
+        "fte": { "type": "number" },
+        "status": { "type": "string", "enum": ["filled", "vacant", "frozen"] }
+      },
+      "required": ["title", "costCenterId", "status"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "An assignment of a worker to a specific position.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string" },
+        "positionId": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "managerId": { "type": "string" }
+      },
+      "required": ["workerId", "positionId", "startDate"]
+    },
+    "Requisition": {
+      "title": "Requisition",
+      "description": "A request to hire for a position.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "positionId": { "type": "string" },
+        "budgetedSalary": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed", "cancelled"] }
+      },
+      "required": ["positionId", "status"]
+    },
+    "Timesheet": {
+      "title": "Timesheet",
+      "description": "Logs of hours worked by employees.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "hours": { "type": "number" },
+        "billable": { "type": "boolean" }
+      },
+      "required": ["workerId", "date", "hours"]
+    },
+    "AbsenceEntry": {
+      "title": "Absence Entry",
+      "description": "Leave requests or time-off entries.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["vacation", "sick", "personal", "maternity", "other"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["workerId", "type", "startDate", "endDate", "status"]
+    }
+  },
+  "firestore": {
+    "/workers/{workerId}": {
+      "schema": "Worker",
+      "description": "Employee master records."
+    },
+    "/positions/{positionId}": {
+      "schema": "Position",
+      "description": "Organizational positions."
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "Worker position history."
+    },
+    "/requisitions/{reqId}": {
+      "schema": "Requisition",
+      "description": "Hiring requests."
+    },
+    "/timesheets/{timesheetId}": {
+      "schema": "Timesheet",
+      "description": "Logged work hours."
+    },
+    "/absences/{absenceId}": {
+      "schema": "AbsenceEntry",
+      "description": "Time-off records."
+    }
+  }
+}
