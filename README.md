@@ -81,3 +81,8 @@ The frontend runs on `http://localhost:3000` and the API runs on `http://localho
 ## Quick check
 
 After setup, open the frontend and verify the dashboard loads. If the API is configured correctly, the app will fetch data from the local backend and database.
+admin@xobiya.com / admin123 (super admin)
+manager@xobiya.com / admin123
+employee@xobiya.com / admin123
+accountant@xobiya.com / admin123
+sales@xobiya.com / admin123

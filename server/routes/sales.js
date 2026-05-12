@@ -3,6 +3,7 @@ import db from '../db.js';
 import { verifyToken, requirePermission } from '../middleware/auth.js';
 import { confirmSalesOrder, recalcQuotationTotal, recalcSalesOrderTotal, createInvoiceFromSalesOrder } from '../services/sales.js';
 import { logAudit, logStatusChange } from '../services/audit.js';
+import { assertWorkflowTransition } from '../services/workflow.js';
 
 const router = Router();
 
@@ -116,8 +117,11 @@ router.get('/orders', verifyToken, requirePermission('sales', 'read'), async (re
 
 router.post('/orders', verifyToken, requirePermission('sales', 'create'), async (req, res) => {
   try {
-    const { customerId, currency, lines } = req.body;
+    const { customerId, currency, lines, status } = req.body;
     if (!customerId) return res.status(400).json({ error: 'customerId is required' });
+    if (status && status !== 'draft') {
+      return res.status(400).json({ error: 'Sales order status must start as draft' });
+    }
 
     const [id] = await db('sales_orders').insert({
       company_id: req.companyId,
@@ -147,6 +151,17 @@ router.post('/orders', verifyToken, requirePermission('sales', 'create'), async 
 
 router.post('/orders/:id/confirm', verifyToken, requirePermission('sales', 'approve'), async (req, res) => {
   try {
+    const existing = await db('sales_orders').where({ id: req.params.id, company_id: req.companyId }).first();
+    if (!existing) return res.status(404).json({ error: 'Sales order not found' });
+
+    await assertWorkflowTransition({
+      module: 'sales_order',
+      fromStatus: existing.status,
+      toStatus: 'confirmed',
+      action: 'confirm',
+      user: req.user,
+    });
+
     const order = await confirmSalesOrder({
       companyId: req.companyId,
       salesOrderId: req.params.id,
@@ -158,7 +173,7 @@ router.post('/orders/:id/confirm', verifyToken, requirePermission('sales', 'appr
       companyId: req.companyId,
       refType: 'sales_order',
       refId: req.params.id,
-      fromStatus: 'draft',
+      fromStatus: existing.status,
       toStatus: 'confirmed',
       userId: req.user.id,
     });
@@ -172,10 +187,31 @@ router.post('/orders/:id/confirm', verifyToken, requirePermission('sales', 'appr
 
 router.post('/orders/:id/invoice', verifyToken, requirePermission('accounting', 'create'), async (req, res) => {
   try {
+    const order = await db('sales_orders').where({ id: req.params.id, company_id: req.companyId }).first();
+    if (!order) return res.status(404).json({ error: 'Sales order not found' });
+    if (order.status !== 'confirmed') return res.status(400).json({ error: 'Sales order must be confirmed before invoicing' });
+
+    await assertWorkflowTransition({
+      module: 'invoice',
+      fromStatus: 'draft',
+      toStatus: 'issued',
+      action: 'issue',
+      user: req.user,
+    });
+
     const invoice = await createInvoiceFromSalesOrder({
       companyId: req.companyId,
       salesOrderId: req.params.id,
       dueDate: req.body.dueDate,
+    });
+
+    await logStatusChange({
+      companyId: req.companyId,
+      refType: 'invoice',
+      refId: invoice.id,
+      fromStatus: 'draft',
+      toStatus: 'issued',
+      userId: req.user.id,
     });
 
     res.status(201).json(invoice);
@@ -199,6 +235,15 @@ router.post('/invoices/:id/pay', verifyToken, requirePermission('accounting', 'u
   try {
     const invoice = await db('invoices').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+    if (invoice.status !== 'issued') return res.status(400).json({ error: 'Only issued invoices can be paid' });
+
+    await assertWorkflowTransition({
+      module: 'invoice',
+      fromStatus: invoice.status,
+      toStatus: 'paid',
+      action: 'pay',
+      user: req.user,
+    });
 
     await db('payments').insert({
       company_id: req.companyId,
@@ -210,10 +255,77 @@ router.post('/invoices/:id/pay', verifyToken, requirePermission('accounting', 'u
     });
 
     await db('invoices').where({ id: invoice.id }).update({ status: 'paid' });
+    await logStatusChange({ companyId: req.companyId, refType: 'invoice', refId: invoice.id, fromStatus: 'issued', toStatus: 'paid', userId: req.user.id });
     res.json({ message: 'Invoice marked as paid' });
   } catch (err) {
     console.error('POST /sales/invoices/:id/pay error:', err);
     res.status(500).json({ error: 'Failed to record payment' });
+  }
+});
+
+router.post('/invoices/:id/cancel', verifyToken, requirePermission('accounting', 'update'), async (req, res) => {
+  try {
+    const invoice = await db('invoices').where({ id: req.params.id, company_id: req.companyId }).first();
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    await assertWorkflowTransition({
+      module: 'invoice',
+      fromStatus: invoice.status,
+      toStatus: 'cancelled',
+      action: 'cancel',
+      user: req.user,
+    });
+
+    await db('invoices').where({ id: invoice.id }).update({ status: 'cancelled', updated_at: db.fn.now() });
+    await logStatusChange({ companyId: req.companyId, refType: 'invoice', refId: invoice.id, fromStatus: invoice.status, toStatus: 'cancelled', userId: req.user.id });
+    res.json({ message: 'Invoice cancelled' });
+  } catch (err) {
+    console.error('POST /sales/invoices/:id/cancel error:', err);
+    res.status(500).json({ error: err.message || 'Failed to cancel invoice' });
+  }
+});
+
+router.post('/orders/:id/fulfill', verifyToken, requirePermission('sales', 'update'), async (req, res) => {
+  try {
+    const order = await db('sales_orders').where({ id: req.params.id, company_id: req.companyId }).first();
+    if (!order) return res.status(404).json({ error: 'Sales order not found' });
+
+    await assertWorkflowTransition({
+      module: 'sales_order',
+      fromStatus: order.status,
+      toStatus: 'fulfilled',
+      action: 'fulfill',
+      user: req.user,
+    });
+
+    await db('sales_orders').where({ id: order.id }).update({ status: 'fulfilled', updated_at: db.fn.now() });
+    await logStatusChange({ companyId: req.companyId, refType: 'sales_order', refId: order.id, fromStatus: order.status, toStatus: 'fulfilled', userId: req.user.id });
+    res.json({ message: 'Sales order fulfilled' });
+  } catch (err) {
+    console.error('POST /sales/orders/:id/fulfill error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fulfill sales order' });
+  }
+});
+
+router.post('/orders/:id/cancel', verifyToken, requirePermission('sales', 'update'), async (req, res) => {
+  try {
+    const order = await db('sales_orders').where({ id: req.params.id, company_id: req.companyId }).first();
+    if (!order) return res.status(404).json({ error: 'Sales order not found' });
+
+    await assertWorkflowTransition({
+      module: 'sales_order',
+      fromStatus: order.status,
+      toStatus: 'cancelled',
+      action: 'cancel',
+      user: req.user,
+    });
+
+    await db('sales_orders').where({ id: order.id }).update({ status: 'cancelled', updated_at: db.fn.now() });
+    await logStatusChange({ companyId: req.companyId, refType: 'sales_order', refId: order.id, fromStatus: order.status, toStatus: 'cancelled', userId: req.user.id });
+    res.json({ message: 'Sales order cancelled' });
+  } catch (err) {
+    console.error('POST /sales/orders/:id/cancel error:', err);
+    res.status(500).json({ error: err.message || 'Failed to cancel sales order' });
   }
 });
 
