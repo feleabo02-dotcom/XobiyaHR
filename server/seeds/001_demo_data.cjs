@@ -67,6 +67,9 @@ exports.seed = async function (knex) {
   await knex('users').del();
   await knex('companies').del();
 
+  await knex('workflow_transitions').del();
+  await knex('workflow_states').del();
+
   const hash = bcrypt.hashSync('admin123', 12);
 
   const [companyId] = await knex('companies').insert({
@@ -98,6 +101,48 @@ exports.seed = async function (knex) {
     return acc;
   }, {});
 
+  await knex('workflow_states').insert([
+    { module: 'purchase_request', state: 'draft', label: 'Draft', sequence: 1 },
+    { module: 'purchase_request', state: 'submitted', label: 'Submitted', sequence: 2 },
+    { module: 'purchase_request', state: 'approved', label: 'Approved', sequence: 3 },
+    { module: 'purchase_request', state: 'rejected', label: 'Rejected', sequence: 4 },
+    { module: 'purchase_order', state: 'draft', label: 'Draft', sequence: 1 },
+    { module: 'purchase_order', state: 'approved', label: 'Approved', sequence: 2 },
+    { module: 'purchase_order', state: 'ordered', label: 'Ordered', sequence: 3 },
+    { module: 'purchase_order', state: 'received', label: 'Received', sequence: 4 },
+    { module: 'purchase_order', state: 'cancelled', label: 'Cancelled', sequence: 5 },
+    { module: 'sales_order', state: 'draft', label: 'Draft', sequence: 1 },
+    { module: 'sales_order', state: 'confirmed', label: 'Confirmed', sequence: 2 },
+    { module: 'sales_order', state: 'fulfilled', label: 'Fulfilled', sequence: 3 },
+    { module: 'sales_order', state: 'cancelled', label: 'Cancelled', sequence: 4 },
+    { module: 'invoice', state: 'draft', label: 'Draft', sequence: 1 },
+    { module: 'invoice', state: 'issued', label: 'Issued', sequence: 2 },
+    { module: 'invoice', state: 'paid', label: 'Paid', sequence: 3 },
+    { module: 'invoice', state: 'cancelled', label: 'Cancelled', sequence: 4 },
+    { module: 'asset', state: 'available', label: 'Available', sequence: 1 },
+    { module: 'asset', state: 'assigned', label: 'Assigned', sequence: 2 },
+  ]);
+
+  await knex('workflow_transitions').insert([
+    { module: 'purchase_request', from_state: 'draft', to_state: 'submitted', action: 'submit', role_required: 'procurement_officer' },
+    { module: 'purchase_request', from_state: 'submitted', to_state: 'approved', action: 'approve', role_required: 'procurement_officer' },
+    { module: 'purchase_request', from_state: 'submitted', to_state: 'rejected', action: 'reject', role_required: 'procurement_officer' },
+    { module: 'purchase_order', from_state: 'draft', to_state: 'approved', action: 'approve', role_required: 'procurement_officer' },
+    { module: 'purchase_order', from_state: 'approved', to_state: 'ordered', action: 'order', role_required: 'procurement_officer' },
+    { module: 'purchase_order', from_state: 'approved', to_state: 'cancelled', action: 'cancel', role_required: 'procurement_officer' },
+    { module: 'purchase_order', from_state: 'ordered', to_state: 'received', action: 'receive', role_required: 'warehouse_staff' },
+    { module: 'purchase_order', from_state: 'ordered', to_state: 'cancelled', action: 'cancel', role_required: 'procurement_officer' },
+    { module: 'sales_order', from_state: 'draft', to_state: 'confirmed', action: 'confirm', role_required: 'sales_rep' },
+    { module: 'sales_order', from_state: 'confirmed', to_state: 'fulfilled', action: 'fulfill', role_required: 'warehouse_staff' },
+    { module: 'sales_order', from_state: 'draft', to_state: 'cancelled', action: 'cancel', role_required: 'sales_rep' },
+    { module: 'sales_order', from_state: 'confirmed', to_state: 'cancelled', action: 'cancel', role_required: 'sales_rep' },
+    { module: 'invoice', from_state: 'draft', to_state: 'issued', action: 'issue', role_required: 'accountant' },
+    { module: 'invoice', from_state: 'issued', to_state: 'paid', action: 'pay', role_required: 'accountant' },
+    { module: 'invoice', from_state: 'issued', to_state: 'cancelled', action: 'cancel', role_required: 'accountant' },
+    { module: 'asset', from_state: 'available', to_state: 'assigned', action: 'assign', role_required: 'hr' },
+    { module: 'asset', from_state: 'assigned', to_state: 'available', action: 'return', role_required: 'hr' },
+  ]);
+
   const modules = ['hr', 'payroll', 'attendance', 'assets', 'inventory', 'procurement', 'sales', 'crm', 'accounting', 'projects', 'reporting', 'attachments', 'activity'];
   const actions = ['read', 'create', 'update', 'approve', 'delete'];
 
@@ -111,6 +156,11 @@ exports.seed = async function (knex) {
       permissionRows.push({ module: moduleName, action, scope: 'company' });
     });
   });
+
+  permissionRows.push(
+    { module: 'assets', action: 'assign', scope: 'company' },
+    { module: 'procurement', action: 'receive', scope: 'company' }
+  );
 
   await knex('permissions').insert(permissionRows);
   const permissions = await knex('permissions').select('id', 'module', 'action');
@@ -149,6 +199,7 @@ exports.seed = async function (knex) {
     { module: 'attendance', action: 'read' },
     { module: 'attendance', action: 'approve' },
     { module: 'payroll', action: 'read' },
+    { module: 'assets', action: 'assign' },
   ]);
   addPerms('accountant', [
     { module: 'accounting', action: 'read' },
@@ -168,12 +219,14 @@ exports.seed = async function (knex) {
     { module: 'procurement', action: 'read' },
     { module: 'procurement', action: 'create' },
     { module: 'procurement', action: 'approve' },
+    { module: 'procurement', action: 'receive' },
     { module: 'inventory', action: 'read' },
   ]);
   addPerms('warehouse_staff', [
     { module: 'inventory', action: 'read' },
     { module: 'inventory', action: 'create' },
     { module: 'inventory', action: 'update' },
+    { module: 'procurement', action: 'receive' },
   ]);
   addPerms('employee', [
     { module: 'hr', action: 'read' },

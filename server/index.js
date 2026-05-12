@@ -25,6 +25,7 @@ import accountingRoutes from './routes/accounting.js';
 import projectRoutes from './routes/projects.js';
 import attachmentRoutes from './routes/attachments.js';
 import activityRoutes from './routes/activity.js';
+import workflowRoutes from './routes/workflows.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -56,6 +57,7 @@ app.use('/api/accounting', accountingRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/workflows', workflowRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'xobiya-hr-api', version: '1.0.0' }));

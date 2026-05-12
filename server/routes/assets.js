@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { verifyToken, requirePermission } from '../middleware/auth.js';
 import { logAudit, logStatusChange } from '../services/audit.js';
+import { assertWorkflowTransition } from '../services/workflow.js';
 
 const router = Router();
 
@@ -99,6 +100,14 @@ router.post('/:id/assign', verifyToken, requirePermission('assets', 'assign'), a
     const asset = await db('assets').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
+    await assertWorkflowTransition({
+      module: 'asset',
+      fromStatus: asset.status,
+      toStatus: 'assigned',
+      action: 'assign',
+      user: req.user,
+    });
+
     const { workerId, startDate, notes } = req.body;
     if (!workerId || !startDate) {
       return res.status(400).json({ error: 'workerId and startDate are required' });
@@ -137,6 +146,14 @@ router.post('/:id/return', verifyToken, requirePermission('assets', 'assign'), a
   try {
     const asset = await db('assets').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!asset) return res.status(404).json({ error: 'Asset not found' });
+
+    await assertWorkflowTransition({
+      module: 'asset',
+      fromStatus: asset.status,
+      toStatus: 'available',
+      action: 'return',
+      user: req.user,
+    });
 
     const activeAssignment = await db('asset_assignments')
       .where({ asset_id: asset.id, status: 'assigned' })

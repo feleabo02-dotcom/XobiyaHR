@@ -12,7 +12,9 @@ import {
   Search,
   Clock,
   FileText,
-  UserPlus
+  UserPlus,
+  ShoppingCart,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -24,9 +26,11 @@ import Positions from './pages/Positions';
 import Absences from './pages/Absences';
 import Assignments from './pages/Assignments';
 import Requisitions from './pages/Requisitions';
+import Procurement from './pages/Procurement';
+import Sales from './pages/Sales';
 import LoginPage from './pages/LoginPage';
 
-type View = 'dashboard' | 'ecosystem' | 'workers' | 'positions' | 'absences' | 'assignments' | 'requisitions';
+type View = 'dashboard' | 'ecosystem' | 'workers' | 'positions' | 'absences' | 'assignments' | 'requisitions' | 'procurement' | 'sales';
 
 function AppContent() {
   const { user, loading, logout } = useAuth();
@@ -53,6 +57,8 @@ function AppContent() {
     { id: 'absences', label: 'Absences', icon: Calendar },
     { id: 'assignments', label: 'Assignments', icon: UserPlus },
     { id: 'requisitions', label: 'Requisitions', icon: FileText },
+    { id: 'procurement', label: 'Procurement', icon: ShoppingCart },
+    { id: 'sales', label: 'Sales', icon: DollarSign },
   ];
 
   return (
@@ -165,6 +171,8 @@ function AppContent() {
               {currentView === 'absences' && <Absences />}
               {currentView === 'assignments' && <Assignments />}
               {currentView === 'requisitions' && <Requisitions />}
+              {currentView === 'procurement' && <Procurement />}
+              {currentView === 'sales' && <Sales />}
             </motion.div>
           </AnimatePresence>
 
