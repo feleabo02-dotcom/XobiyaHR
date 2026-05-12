@@ -9,6 +9,7 @@ router.get('/', verifyToken, async (req, res) => {
     const rows = await db('departments')
       .leftJoin('workers', 'departments.manager_id', 'workers.id')
       .select('departments.*', db.raw('CONCAT(workers.first_name, " ", workers.last_name) as manager_name'))
+      .where('departments.company_id', req.companyId)
       .orderBy('departments.name');
     res.json(rows.map(r => ({
       id: String(r.id),
@@ -33,6 +34,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
     if (!name || !code) return res.status(400).json({ error: 'name and code are required' });
 
     const [id] = await db('departments').insert({
+      company_id: req.companyId,
       name, code,
       cost_center_id: costCenterId || null,
       manager_id: managerId || null,
@@ -50,7 +52,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
 router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   try {
     const { name, code, costCenterId, managerId, isActive } = req.body;
-    await db('departments').where({ id: req.params.id }).update({
+    await db('departments').where({ id: req.params.id, company_id: req.companyId }).update({
       name, code,
       cost_center_id: costCenterId,
       manager_id: managerId,

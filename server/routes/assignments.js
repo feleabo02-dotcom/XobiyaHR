@@ -17,6 +17,7 @@ router.get('/', verifyToken, async (req, res) => {
         'positions.title as position_title',
         'departments.name as department_name'
       )
+      .where('assignments.company_id', req.companyId)
       .orderBy('assignments.created_at', 'desc');
 
     res.json(rows.map(r => ({
@@ -47,6 +48,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
     }
 
     const [id] = await db('assignments').insert({
+      company_id: req.companyId,
       worker_id: workerId,
       position_id: positionId,
       start_date: startDate,
@@ -54,7 +56,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
       manager_id: managerId || null,
     });
 
-    await db('positions').where({ id: positionId }).update({ status: 'filled', updated_at: db.fn.now() });
+    await db('positions').where({ id: positionId, company_id: req.companyId }).update({ status: 'filled', updated_at: db.fn.now() });
 
     res.status(201).json({ id: String(id), message: 'Assignment created' });
   } catch (err) {
@@ -66,7 +68,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
 router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   try {
     const { endDate, managerId } = req.body;
-    const existing = await db('assignments').where({ id: req.params.id }).first();
+    const existing = await db('assignments').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Assignment not found' });
 
     await db('assignments').where({ id: req.params.id }).update({
@@ -76,9 +78,13 @@ router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
     });
 
     if (endDate) {
-      const active = await db('assignments').where({ position_id: existing.position_id }).whereNull('end_date').whereNot({ id: req.params.id }).first();
+      const active = await db('assignments')
+        .where({ position_id: existing.position_id, company_id: req.companyId })
+        .whereNull('end_date')
+        .whereNot({ id: req.params.id })
+        .first();
       if (!active) {
-        await db('positions').where({ id: existing.position_id }).update({ status: 'vacant', updated_at: db.fn.now() });
+        await db('positions').where({ id: existing.position_id, company_id: req.companyId }).update({ status: 'vacant', updated_at: db.fn.now() });
       }
     }
     res.json({ message: 'Assignment updated' });

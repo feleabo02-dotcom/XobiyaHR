@@ -11,11 +11,12 @@
     "server:dev": "tsx watch server/index.js",
     "start": "node server/index.js",
     "lint": "tsc --noEmit",
+    "db:create": "node server/db_init.cjs",
     "db:migrate": "knex migrate:latest --knexfile knexfile.js",
     "db:rollback": "knex migrate:rollback --knexfile knexfile.js",
     "db:seed": "knex seed:run --knexfile knexfile.js",
-    "db:setup": "knex migrate:latest --knexfile knexfile.js && knex seed:run --knexfile knexfile.js",
-    "db:reset": "knex migrate:rollback --knexfile knexfile.js --all && knex migrate:latest --knexfile knexfile.js && knex seed:run --knexfile knexfile.js"
+    "db:setup": "npm run db:create && npm run db:migrate && npm run db:seed",
+    "db:reset": "npm run db:rollback --all && npm run db:migrate && npm run db:seed"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

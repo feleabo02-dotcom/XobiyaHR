@@ -15,6 +15,7 @@ router.get('/', verifyToken, async (req, res) => {
         'departments.code as department_code',
         'compensation_grades.code as grade_code'
       )
+      .where('workers.company_id', req.companyId)
       .orderBy('workers.last_name');
 
     res.json(rows.map(mapWorker));
@@ -31,6 +32,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       .leftJoin('compensation_grades', 'workers.grade_id', 'compensation_grades.id')
       .select('workers.*', 'departments.name as department_name', 'compensation_grades.code as grade_code')
       .where('workers.id', req.params.id)
+      .andWhere('workers.company_id', req.companyId)
       .first();
 
     if (!row) return res.status(404).json({ error: 'Worker not found' });
@@ -49,6 +51,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
     }
 
     const [id] = await db('workers').insert({
+      company_id: req.companyId,
       employee_id: employeeId || null,
       first_name: firstName,
       last_name: lastName,
@@ -72,7 +75,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
 
 router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
   try {
-    const existing = await db('workers').where({ id: req.params.id }).first();
+    const existing = await db('workers').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Worker not found' });
 
     const { firstName, lastName, email, phone, workerType, hireDate, status, departmentId, jobTitle } = req.body;
@@ -99,7 +102,7 @@ router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) =
 
 router.delete('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   try {
-    const deleted = await db('workers').where({ id: req.params.id }).del();
+    const deleted = await db('workers').where({ id: req.params.id, company_id: req.companyId }).del();
     if (!deleted) return res.status(404).json({ error: 'Worker not found' });
     res.json({ message: 'Worker deleted' });
   } catch (err) {

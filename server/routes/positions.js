@@ -15,6 +15,7 @@ router.get('/', verifyToken, async (req, res) => {
         'compensation_grades.code as grade_code',
         'compensation_grades.title as grade_title'
       )
+      .where('positions.company_id', req.companyId)
       .orderBy('positions.title');
 
     res.json(rows.map(r => ({
@@ -42,7 +43,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.get('/:id', verifyToken, async (req, res) => {
   try {
-    const row = await db('positions').where({ id: req.params.id }).first();
+    const row = await db('positions').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!row) return res.status(404).json({ error: 'Position not found' });
     res.json(row);
   } catch (err) {
@@ -57,6 +58,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
     if (!title || !costCenterId) return res.status(400).json({ error: 'title and costCenterId are required' });
 
     const [id] = await db('positions').insert({
+      company_id: req.companyId,
       title,
       grade_id: gradeId || null,
       cost_center_id: costCenterId,
@@ -79,7 +81,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
 router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   try {
     const { title, gradeId, costCenterId, departmentId, location, fte, budgetedSalary, status, description } = req.body;
-    const existing = await db('positions').where({ id: req.params.id }).first();
+    const existing = await db('positions').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Position not found' });
 
     await db('positions').where({ id: req.params.id }).update({
@@ -97,7 +99,7 @@ router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
 
 router.delete('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   try {
-    const deleted = await db('positions').where({ id: req.params.id }).del();
+    const deleted = await db('positions').where({ id: req.params.id, company_id: req.companyId }).del();
     if (!deleted) return res.status(404).json({ error: 'Position not found' });
     res.json({ message: 'Position deleted' });
   } catch (err) {

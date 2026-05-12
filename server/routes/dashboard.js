@@ -1,28 +1,30 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/stats', verifyToken, async (req, res) => {
   try {
-    const [totalWorkers] = await db('workers').count('* as count');
-    const [activeWorkers] = await db('workers').where('status', 'active').count('* as count');
-    const [onboardingWorkers] = await db('workers').where('status', 'onboarding').count('* as count');
-    const [totalPositions] = await db('positions').count('* as count');
-    const [vacantPositions] = await db('positions').where('status', 'vacant').count('* as count');
-    const [filledPositions] = await db('positions').where('status', 'filled').count('* as count');
-    const [pendingAbsences] = await db('absences').where('status', 'pending').count('* as count');
-    const [openRequisitions] = await db('requisitions').where('status', 'open').count('* as count');
-    const [activeAssignments] = await db('assignments').whereNull('end_date').count('* as count');
-    const [pendingTimesheets] = await db('timesheets').where('status', 'submitted').count('* as count');
-    const [totalCourses] = await db('courses').where('status', 'active').count('* as count');
-    const [totalGoals] = await db('goals').where('status', 'active').count('* as count');
-    const [upcomingReviews] = await db('performance_reviews').where('status', 'in_progress').count('* as count');
+    const companyId = req.companyId;
+    const [totalWorkers] = await db('workers').where('company_id', companyId).count('* as count');
+    const [activeWorkers] = await db('workers').where({ status: 'active', company_id: companyId }).count('* as count');
+    const [onboardingWorkers] = await db('workers').where({ status: 'onboarding', company_id: companyId }).count('* as count');
+    const [totalPositions] = await db('positions').where('company_id', companyId).count('* as count');
+    const [vacantPositions] = await db('positions').where({ status: 'vacant', company_id: companyId }).count('* as count');
+    const [filledPositions] = await db('positions').where({ status: 'filled', company_id: companyId }).count('* as count');
+    const [pendingAbsences] = await db('absences').where({ status: 'pending', company_id: companyId }).count('* as count');
+    const [openRequisitions] = await db('requisitions').where({ status: 'open', company_id: companyId }).count('* as count');
+    const [activeAssignments] = await db('assignments').whereNull('end_date').andWhere('company_id', companyId).count('* as count');
+    const [pendingTimesheets] = await db('timesheets').where({ status: 'submitted', company_id: companyId }).count('* as count');
+    const [totalCourses] = await db('courses').where({ status: 'active', company_id: companyId }).count('* as count');
+    const [totalGoals] = await db('goals').where({ status: 'active', company_id: companyId }).count('* as count');
+    const [upcomingReviews] = await db('performance_reviews').where({ status: 'in_progress', company_id: companyId }).count('* as count');
 
     const payrollSummary = await db('payroll_results')
       .join('payroll_periods', 'payroll_results.payroll_period_id', 'payroll_periods.id')
       .where('payroll_periods.status', 'closed')
+      .andWhere('payroll_results.company_id', companyId)
       .sum('gross_pay as total_gross')
       .sum('net_pay as total_net')
       .sum('employer_tax as total_tax')
@@ -33,6 +35,7 @@ router.get('/stats', verifyToken, async (req, res) => {
       .join('departments', 'workers.department_id', 'departments.id')
       .select('departments.name', 'departments.code')
       .count('* as count')
+      .where('workers.company_id', companyId)
       .groupBy('departments.id', 'departments.name', 'departments.code')
       .orderBy('count', 'desc');
 
@@ -49,12 +52,14 @@ router.get('/stats', verifyToken, async (req, res) => {
         'absences.duration_days'
       )
       .where('absences.status', 'pending')
+      .andWhere('absences.company_id', companyId)
       .orderBy('absences.created_at', 'desc')
       .limit(5);
 
     const workerTypeDist = await db('workers')
       .select('worker_type')
       .count('* as count')
+      .where('company_id', companyId)
       .groupBy('worker_type');
 
     res.json({
@@ -104,10 +109,12 @@ router.get('/stats', verifyToken, async (req, res) => {
 
 router.get('/erp-bridge', verifyToken, requireRole('hr', 'finance'), async (req, res) => {
   try {
-    const openReqs = await db('requisitions').where('status', 'open').count('* as count');
+    const companyId = req.companyId;
+    const openReqs = await db('requisitions').where({ status: 'open', company_id: companyId }).count('* as count');
     const payrollSummary = await db('payroll_results')
       .join('payroll_periods', 'payroll_results.payroll_period_id', 'payroll_periods.id')
       .where('payroll_periods.status', 'closed')
+      .andWhere('payroll_results.company_id', companyId)
       .sum('gross_pay as gross')
       .sum('employer_tax as tax')
       .sum('employer_benefits as benefits')

@@ -18,6 +18,7 @@ router.get('/', verifyToken, async (req, res) => {
         'req_users.display_name as requested_by_name',
         'app_users.display_name as approved_by_name'
       )
+      .where('requisitions.company_id', req.companyId)
       .orderBy('requisitions.created_at', 'desc');
 
     res.json(rows.map(r => ({
@@ -50,6 +51,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
     if (!positionId) return res.status(400).json({ error: 'positionId is required' });
 
     const [id] = await db('requisitions').insert({
+      company_id: req.companyId,
       position_id: positionId,
       budgeted_salary: budgetedSalary || null,
       status: 'open',
@@ -72,7 +74,7 @@ router.put('/:id/status', verifyToken, requireRole('hr'), async (req, res) => {
       return res.status(400).json({ error: 'Status must be "closed" or "cancelled"' });
     }
 
-    const existing = await db('requisitions').where({ id: req.params.id }).first();
+    const existing = await db('requisitions').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Requisition not found' });
 
     await db('requisitions').where({ id: req.params.id }).update({

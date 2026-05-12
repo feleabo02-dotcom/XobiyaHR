@@ -16,6 +16,15 @@ import payrollRoutes from './routes/payroll.js';
 import performanceRoutes from './routes/performance.js';
 import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
+import companyRoutes from './routes/companies.js';
+import assetRoutes from './routes/assets.js';
+import inventoryRoutes from './routes/inventory.js';
+import procurementRoutes from './routes/procurement.js';
+import salesRoutes from './routes/sales.js';
+import accountingRoutes from './routes/accounting.js';
+import projectRoutes from './routes/projects.js';
+import attachmentRoutes from './routes/attachments.js';
+import activityRoutes from './routes/activity.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -38,6 +47,15 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/procurement', procurementRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/accounting', accountingRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/attachments', attachmentRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'xobiya-hr-api', version: '1.0.0' }));

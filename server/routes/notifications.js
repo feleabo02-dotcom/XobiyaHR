@@ -7,7 +7,7 @@ const router = Router();
 router.get('/', verifyToken, async (req, res) => {
   try {
     const rows = await db('notifications')
-      .where({ user_id: req.user.id })
+      .where({ user_id: req.user.id, company_id: req.companyId })
       .orderBy('created_at', 'desc')
       .limit(20);
 
@@ -28,7 +28,9 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.get('/unread-count', verifyToken, async (req, res) => {
   try {
-    const [row] = await db('notifications').where({ user_id: req.user.id, is_read: false }).count('* as count');
+    const [row] = await db('notifications')
+      .where({ user_id: req.user.id, company_id: req.companyId, is_read: false })
+      .count('* as count');
     res.json({ count: Number(row.count) });
   } catch (err) {
     console.error('GET /notifications/unread-count error:', err);
@@ -38,7 +40,7 @@ router.get('/unread-count', verifyToken, async (req, res) => {
 
 router.put('/:id/read', verifyToken, async (req, res) => {
   try {
-    await db('notifications').where({ id: req.params.id, user_id: req.user.id }).update({ is_read: true });
+    await db('notifications').where({ id: req.params.id, user_id: req.user.id, company_id: req.companyId }).update({ is_read: true });
     res.json({ message: 'Marked as read' });
   } catch (err) {
     console.error('PUT /notifications/:id/read error:', err);
@@ -48,7 +50,7 @@ router.put('/:id/read', verifyToken, async (req, res) => {
 
 router.put('/read-all', verifyToken, async (req, res) => {
   try {
-    await db('notifications').where({ user_id: req.user.id, is_read: false }).update({ is_read: true });
+    await db('notifications').where({ user_id: req.user.id, company_id: req.companyId, is_read: false }).update({ is_read: true });
     res.json({ message: 'All notifications marked as read' });
   } catch (err) {
     console.error('PUT /notifications/read-all error:', err);

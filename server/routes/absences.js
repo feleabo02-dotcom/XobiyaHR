@@ -15,10 +15,11 @@ router.get('/', verifyToken, async (req, res) => {
         'absence_types.code as absence_type_code',
         'absence_types.label as absence_type_label'
       )
+      .where('absences.company_id', req.companyId)
       .orderBy('absences.created_at', 'desc');
 
     if (req.user.role === 'employee') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) query = query.where('absences.worker_id', worker.id);
       else return res.json([]);
     }
@@ -52,13 +53,14 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'absenceTypeId, startDate, and endDate are required' });
     }
 
-    const worker = await db('workers').where({ user_id: req.user.id }).first();
+    const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
     if (!worker) return res.status(400).json({ error: 'No worker profile linked to your account' });
 
     const s = new Date(startDate), e = new Date(endDate);
     const duration = Math.max(1, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     const [id] = await db('absences').insert({
+      company_id: req.companyId,
       worker_id: worker.id,
       absence_type_id: absenceTypeId,
       start_date: startDate,
@@ -93,7 +95,7 @@ router.put('/:id/status', verifyToken, requireRole('hr', 'manager'), async (req,
       return res.status(400).json({ error: 'Status must be "approved" or "rejected"' });
     }
 
-    const existing = await db('absences').where({ id: req.params.id }).first();
+    const existing = await db('absences').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Absence not found' });
 
     await db('absences').where({ id: req.params.id }).update({
@@ -125,6 +127,7 @@ router.put('/:id/cancel', verifyToken, async (req, res) => {
       .join('workers', 'absences.worker_id', 'workers.id')
       .select('absences.*')
       .where('absences.id', req.params.id)
+      .andWhere('absences.company_id', req.companyId)
       .andWhere('workers.user_id', req.user.id)
       .first();
 
@@ -148,7 +151,7 @@ router.put('/:id/cancel', verifyToken, async (req, res) => {
 // Get absence types
 router.get('/types', verifyToken, async (req, res) => {
   try {
-    const types = await db('absence_types').orderBy('label');
+    const types = await db('absence_types').where({ company_id: req.companyId }).orderBy('label');
     res.json(types.map(t => ({
       id: String(t.id),
       code: t.code,
@@ -167,13 +170,14 @@ router.get('/types', verifyToken, async (req, res) => {
 // Get leave balances for current user
 router.get('/balances', verifyToken, async (req, res) => {
   try {
-    const worker = await db('workers').where({ user_id: req.user.id }).first();
+    const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
     if (!worker) return res.json([]);
 
     const balances = await db('leave_balances')
       .join('absence_types', 'leave_balances.absence_type_id', 'absence_types.id')
       .select('leave_balances.*', 'absence_types.code', 'absence_types.label', 'absence_types.paid')
-      .where('leave_balances.worker_id', worker.id);
+      .where('leave_balances.worker_id', worker.id)
+      .andWhere('leave_balances.company_id', req.companyId);
 
     res.json(balances.map(b => ({
       id: String(b.id),

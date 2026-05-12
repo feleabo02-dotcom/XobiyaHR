@@ -11,10 +11,11 @@ router.get('/', verifyToken, async (req, res) => {
       .select(
         'timesheets.*',
         db.raw('CONCAT(workers.first_name, " ", workers.last_name) as worker_name')
-      );
+      )
+      .where('timesheets.company_id', req.companyId);
 
     if (req.user.role === 'employee') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) query = query.where('timesheets.worker_id', worker.id);
       else return res.json([]);
     }
@@ -49,10 +50,11 @@ router.post('/', verifyToken, async (req, res) => {
     const { projectId, date, hours, billable, description } = req.body;
     if (!date || hours == null) return res.status(400).json({ error: 'date and hours are required' });
 
-    const worker = await db('workers').where({ user_id: req.user.id }).first();
+    const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
     if (!worker) return res.status(400).json({ error: 'No worker profile linked' });
 
     const [id] = await db('timesheets').insert({
+      company_id: req.companyId,
       worker_id: worker.id,
       project_id: projectId || null,
       date,
@@ -77,6 +79,7 @@ router.put('/:id', verifyToken, async (req, res) => {
       .join('workers', 'timesheets.worker_id', 'workers.id')
       .select('timesheets.*')
       .where('timesheets.id', req.params.id)
+      .andWhere('timesheets.company_id', req.companyId)
       .andWhere('workers.user_id', req.user.id)
       .first();
 
@@ -103,6 +106,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
     const deleted = await db('timesheets')
       .join('workers', 'timesheets.worker_id', 'workers.id')
       .where('timesheets.id', req.params.id)
+      .andWhere('timesheets.company_id', req.companyId)
       .andWhere('workers.user_id', req.user.id)
       .del();
 
@@ -120,6 +124,7 @@ router.put('/:id/submit', verifyToken, async (req, res) => {
       .join('workers', 'timesheets.worker_id', 'workers.id')
       .select('timesheets.*')
       .where('timesheets.id', req.params.id)
+      .andWhere('timesheets.company_id', req.companyId)
       .andWhere('workers.user_id', req.user.id)
       .first();
 

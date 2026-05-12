@@ -6,7 +6,9 @@ const router = Router();
 
 router.get('/periods', verifyToken, requireRole('hr', 'payroll', 'finance'), async (req, res) => {
   try {
-    const rows = await db('payroll_periods').orderBy('start_date', 'desc');
+    const rows = await db('payroll_periods')
+      .where('company_id', req.companyId)
+      .orderBy('start_date', 'desc');
     res.json(rows.map(r => ({
       id: String(r.id),
       code: r.code,
@@ -34,6 +36,7 @@ router.get('/results', verifyToken, requireRole('hr', 'payroll', 'finance'), asy
         'payroll_periods.start_date as period_start',
         'payroll_periods.end_date as period_end'
       )
+      .where('payroll_results.company_id', req.companyId)
       .orderBy('payroll_results.created_at', 'desc');
 
     res.json(rows.map(r => ({
@@ -69,6 +72,7 @@ router.get('/journal', verifyToken, requireRole('hr', 'payroll', 'finance'), asy
         db.raw('CONCAT(workers.first_name, " ", workers.last_name) as worker_name'),
         'payroll_results.payroll_period_id'
       )
+      .where('payroll_journal.company_id', req.companyId)
       .orderBy('payroll_journal.created_at', 'desc')
       .limit(100);
 
