@@ -6,7 +6,9 @@ const router = Router();
 
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const rows = await db('courses').orderBy('title');
+    const rows = await db('courses')
+      .where('company_id', req.companyId)
+      .orderBy('title');
     res.json(rows.map(r => ({
       id: String(r.id),
       title: r.title,
@@ -30,6 +32,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
     if (!title) return res.status(400).json({ error: 'title is required' });
 
     const [id] = await db('courses').insert({
+      company_id: req.companyId,
       title,
       description: description || null,
       type: type || 'online',
@@ -57,10 +60,11 @@ router.get('/enrollments', verifyToken, async (req, res) => {
         'courses.type as course_type',
         'courses.mandatory',
         db.raw('CONCAT(workers.first_name, " ", workers.last_name) as worker_name')
-      );
+      )
+      .where('enrollments.company_id', req.companyId);
 
     if (req.user.role === 'employee') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) query = query.where('enrollments.worker_id', worker.id);
       else return res.json([]);
     }
@@ -91,10 +95,11 @@ router.post('/enroll', verifyToken, async (req, res) => {
     const { courseId } = req.body;
     if (!courseId) return res.status(400).json({ error: 'courseId is required' });
 
-    const worker = await db('workers').where({ user_id: req.user.id }).first();
+    const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
     if (!worker) return res.status(400).json({ error: 'No worker profile linked' });
 
     const [id] = await db('enrollments').insert({
+      company_id: req.companyId,
       course_id: courseId,
       worker_id: worker.id,
       enrollment_date: db.fn.now(),

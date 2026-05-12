@@ -16,7 +16,7 @@ exports.up = function (knex) {
       t.string('name', 100).notNullable().unique();
       t.string('code', 20).notNullable().unique();
       t.string('cost_center_id', 50);
-      t.integer('manager_id').unsigned().references('id').inTable('workers').onDelete('SET NULL');
+      t.integer('manager_id').unsigned();
       t.integer('parent_department_id').unsigned().references('id').inTable('departments').onDelete('SET NULL');
       t.boolean('is_active').notNullable().defaultTo(true);
       t.timestamp('created_at').defaultTo(knex.fn.now());

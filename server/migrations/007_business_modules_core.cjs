@@ -102,7 +102,7 @@ exports.up = function (knex) {
     .createTable('purchase_requests', (t) => {
       t.increments('id').primary();
       t.integer('company_id').unsigned().notNullable().references('id').inTable('companies').onDelete('CASCADE');
-      t.integer('requester_id').unsigned().notNullable().references('id').inTable('users').onDelete('SET NULL');
+      t.integer('requester_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
       t.enu('status', ['draft', 'submitted', 'approved', 'rejected']).notNullable().defaultTo('draft');
       t.text('reason');
       t.timestamp('created_at').defaultTo(knex.fn.now());

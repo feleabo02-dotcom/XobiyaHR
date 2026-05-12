@@ -8,19 +8,20 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     let query = db('goals')
       .join('workers', 'goals.worker_id', 'workers.id')
-      .select('goals.*', db.raw('CONCAT(workers.first_name, " ", workers.last_name) as worker_name'));
+      .select('goals.*', db.raw('CONCAT(workers.first_name, " ", workers.last_name) as worker_name'))
+      .where('goals.company_id', req.companyId);
 
     if (req.user.role === 'employee') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) query = query.where('goals.worker_id', worker.id);
       else return res.json([]);
     } else if (req.user.role === 'manager') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) {
         query = query.where(function () {
           this.where('goals.worker_id', worker.id)
             .orWhereIn('goals.worker_id', function () {
-              this.select('worker_id').from('assignments').where('manager_id', worker.id);
+              this.select('worker_id').from('assignments').where('manager_id', worker.id).andWhere('company_id', req.companyId);
             });
         });
       }
@@ -57,6 +58,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
     if (!workerId || !title) return res.status(400).json({ error: 'workerId and title are required' });
 
     const [id] = await db('goals').insert({
+      company_id: req.companyId,
       worker_id: workerId,
       title,
       description: description || null,
@@ -78,7 +80,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
 router.put('/:id', verifyToken, async (req, res) => {
   try {
     const { title, description, status, progress, endDate } = req.body;
-    const existing = await db('goals').where({ id: req.params.id }).first();
+    const existing = await db('goals').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
 
     await db('goals').where({ id: req.params.id }).update({
@@ -99,7 +101,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 
 router.delete('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
   try {
-    await db('goals').where({ id: req.params.id }).del();
+    await db('goals').where({ id: req.params.id, company_id: req.companyId }).del();
     res.json({ message: 'Goal deleted' });
   } catch (err) {
     console.error('DELETE /goals/:id error:', err);

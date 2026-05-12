@@ -13,10 +13,11 @@ router.get('/', verifyToken, async (req, res) => {
         'performance_reviews.*',
         db.raw('CONCAT(w.first_name, " ", w.last_name) as worker_name'),
         db.raw('CONCAT(r.first_name, " ", r.last_name) as reviewer_name')
-      );
+      )
+      .where('performance_reviews.company_id', req.companyId);
 
     if (req.user.role === 'employee') {
-      const worker = await db('workers').where({ user_id: req.user.id }).first();
+      const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
       if (worker) query = query.where('performance_reviews.worker_id', worker.id);
       else return res.json([]);
     }
@@ -48,6 +49,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
     if (!workerId || !title) return res.status(400).json({ error: 'workerId and title are required' });
 
     const [id] = await db('performance_reviews').insert({
+      company_id: req.companyId,
       worker_id: workerId,
       reviewer_id: req.user.id,
       title,
@@ -66,7 +68,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
 router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
   try {
     const { status, overallRating, summary, reviewDate } = req.body;
-    await db('performance_reviews').where({ id: req.params.id }).update({
+    await db('performance_reviews').where({ id: req.params.id, company_id: req.companyId }).update({
       status: status || 'draft',
       overall_rating: overallRating ?? null,
       summary: summary ?? null,

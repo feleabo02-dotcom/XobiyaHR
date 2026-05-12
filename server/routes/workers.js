@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
-    const rows = await db('workers')
+    let query = db('workers')
       .leftJoin('departments', 'workers.department_id', 'departments.id')
       .leftJoin('compensation_grades', 'workers.grade_id', 'compensation_grades.id')
       .select(
@@ -18,6 +18,16 @@ router.get('/', verifyToken, async (req, res) => {
       .where('workers.company_id', req.companyId)
       .orderBy('workers.last_name');
 
+    if (req.user.role === 'employee') {
+      const worker = await db('workers')
+        .where({ user_id: req.user.id, company_id: req.companyId })
+        .first();
+      if (!worker) return res.json([]);
+      query = query.andWhere('workers.id', worker.id);
+    }
+
+    const rows = await query;
+
     res.json(rows.map(mapWorker));
   } catch (err) {
     console.error('GET /workers error:', err);
@@ -25,7 +35,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const row = await db('workers')
       .leftJoin('departments', 'workers.department_id', 'departments.id')
@@ -35,6 +45,15 @@ router.get('/:id', verifyToken, async (req, res) => {
       .andWhere('workers.company_id', req.companyId)
       .first();
 
+    if (req.user.role === 'employee') {
+      const selfWorker = await db('workers')
+        .where({ user_id: req.user.id, company_id: req.companyId })
+        .first();
+      if (!selfWorker || String(selfWorker.id) !== String(req.params.id)) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+    }
+
     if (!row) return res.status(404).json({ error: 'Worker not found' });
     res.json(mapWorker(row));
   } catch (err) {
@@ -43,7 +62,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { firstName, lastName, email, phone, workerType, hireDate, status, departmentId, jobTitle, employeeId } = req.body;
     if (!firstName || !lastName || !email) {
@@ -73,7 +92,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
   }
 });
 
-router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const existing = await db('workers').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!existing) return res.status(404).json({ error: 'Worker not found' });
@@ -100,7 +119,7 @@ router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) =
   }
 });
 
-router.delete('/:id', verifyToken, requireRole('hr'), async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('hr', 'delete'), async (req, res) => {
   try {
     const deleted = await db('workers').where({ id: req.params.id, company_id: req.companyId }).del();
     if (!deleted) return res.status(404).json({ error: 'Worker not found' });
