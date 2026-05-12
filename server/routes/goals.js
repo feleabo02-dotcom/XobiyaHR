@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     let query = db('goals')
       .join('workers', 'goals.worker_id', 'workers.id')
@@ -52,7 +52,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { workerId, title, description, type, startDate, endDate, weight } = req.body;
     if (!workerId || !title) return res.status(400).json({ error: 'workerId and title are required' });
@@ -77,7 +77,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const { title, description, status, progress, endDate } = req.body;
     const existing = await db('goals').where({ id: req.params.id, company_id: req.companyId }).first();
@@ -99,7 +99,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('hr', 'delete'), async (req, res) => {
   try {
     await db('goals').where({ id: req.params.id, company_id: req.companyId }).del();
     res.json({ message: 'Goal deleted' });

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/periods', verifyToken, requireRole('hr', 'payroll', 'finance'), async (req, res) => {
+router.get('/periods', verifyToken, requirePermission('payroll', 'read'), async (req, res) => {
   try {
     const rows = await db('payroll_periods')
       .where('company_id', req.companyId)
@@ -23,7 +23,7 @@ router.get('/periods', verifyToken, requireRole('hr', 'payroll', 'finance'), asy
   }
 });
 
-router.get('/results', verifyToken, requireRole('hr', 'payroll', 'finance'), async (req, res) => {
+router.get('/results', verifyToken, requirePermission('payroll', 'read'), async (req, res) => {
   try {
     const rows = await db('payroll_results')
       .join('workers', 'payroll_results.worker_id', 'workers.id')
@@ -62,7 +62,7 @@ router.get('/results', verifyToken, requireRole('hr', 'payroll', 'finance'), asy
   }
 });
 
-router.get('/journal', verifyToken, requireRole('hr', 'payroll', 'finance'), async (req, res) => {
+router.get('/journal', verifyToken, requirePermission('payroll', 'read'), async (req, res) => {
   try {
     const rows = await db('payroll_journal')
       .join('payroll_results', 'payroll_journal.payroll_result_id', 'payroll_results.id')

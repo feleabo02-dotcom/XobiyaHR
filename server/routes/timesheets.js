@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('attendance', 'read'), async (req, res) => {
   try {
     let query = db('timesheets')
       .join('workers', 'timesheets.worker_id', 'workers.id')
@@ -45,7 +45,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('attendance', 'create'), async (req, res) => {
   try {
     const { projectId, date, hours, billable, description } = req.body;
     if (!date || hours == null) return res.status(400).json({ error: 'date and hours are required' });
@@ -71,7 +71,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('attendance', 'update'), async (req, res) => {
   try {
     const { projectId, date, hours, billable, description } = req.body;
 
@@ -101,7 +101,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('attendance', 'delete'), async (req, res) => {
   try {
     const deleted = await db('timesheets')
       .join('workers', 'timesheets.worker_id', 'workers.id')
@@ -118,7 +118,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id/submit', verifyToken, async (req, res) => {
+router.put('/:id/submit', verifyToken, requirePermission('attendance', 'update'), async (req, res) => {
   try {
     const entry = await db('timesheets')
       .join('workers', 'timesheets.worker_id', 'workers.id')
@@ -139,7 +139,7 @@ router.put('/:id/submit', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id/approve', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.put('/:id/approve', verifyToken, requirePermission('attendance', 'approve'), async (req, res) => {
   try {
     await db('timesheets').where({ id: req.params.id }).update({
       status: 'approved',

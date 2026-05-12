@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const rows = await db('positions')
       .leftJoin('departments', 'positions.department_id', 'departments.id')
@@ -41,7 +41,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const row = await db('positions').where({ id: req.params.id, company_id: req.companyId }).first();
     if (!row) return res.status(404).json({ error: 'Position not found' });
@@ -52,7 +52,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { title, gradeId, costCenterId, departmentId, location, fte, budgetedSalary, status, description } = req.body;
     if (!title || !costCenterId) return res.status(400).json({ error: 'title and costCenterId are required' });
@@ -78,7 +78,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const { title, gradeId, costCenterId, departmentId, location, fte, budgetedSalary, status, description } = req.body;
     const existing = await db('positions').where({ id: req.params.id, company_id: req.companyId }).first();
@@ -97,7 +97,7 @@ router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, requireRole('hr'), async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('hr', 'delete'), async (req, res) => {
   try {
     const deleted = await db('positions').where({ id: req.params.id, company_id: req.companyId }).del();
     if (!deleted) return res.status(404).json({ error: 'Position not found' });

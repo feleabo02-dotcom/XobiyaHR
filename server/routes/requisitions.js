@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const rows = await db('requisitions')
       .join('positions', 'requisitions.position_id', 'positions.id')
@@ -45,7 +45,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { positionId, budgetedSalary, notes } = req.body;
     if (!positionId) return res.status(400).json({ error: 'positionId is required' });
@@ -67,7 +67,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
   }
 });
 
-router.put('/:id/status', verifyToken, requireRole('hr'), async (req, res) => {
+router.put('/:id/status', verifyToken, requirePermission('hr', 'approve'), async (req, res) => {
   try {
     const { status } = req.body;
     if (!['closed', 'cancelled'].includes(status)) {

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const rows = await db('assignments')
       .join('workers', 'assignments.worker_id', 'workers.id')
@@ -40,7 +40,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { workerId, positionId, startDate, endDate, managerId } = req.body;
     if (!workerId || !positionId || !startDate) {
@@ -65,7 +65,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, requireRole('hr'), async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const { endDate, managerId } = req.body;
     const existing = await db('assignments').where({ id: req.params.id, company_id: req.companyId }).first();

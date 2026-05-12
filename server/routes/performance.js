@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     let query = db('performance_reviews')
       .join('workers as w', 'performance_reviews.worker_id', 'w.id')
@@ -43,7 +43,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { workerId, title, type, reviewDate } = req.body;
     if (!workerId || !title) return res.status(400).json({ error: 'workerId and title are required' });
@@ -65,7 +65,7 @@ router.post('/', verifyToken, requireRole('hr', 'manager'), async (req, res) => 
   }
 });
 
-router.put('/:id', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const { status, overallRating, summary, reviewDate } = req.body;
     await db('performance_reviews').where({ id: req.params.id, company_id: req.companyId }).update({

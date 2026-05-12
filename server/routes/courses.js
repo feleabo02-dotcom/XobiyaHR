@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const rows = await db('courses')
       .where('company_id', req.companyId)
@@ -26,7 +26,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('hr', 'create'), async (req, res) => {
   try {
     const { title, description, type, provider, durationHours, mandatory } = req.body;
     if (!title) return res.status(400).json({ error: 'title is required' });
@@ -49,7 +49,7 @@ router.post('/', verifyToken, requireRole('hr'), async (req, res) => {
 });
 
 // Enrollments
-router.get('/enrollments', verifyToken, async (req, res) => {
+router.get('/enrollments', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     let query = db('enrollments')
       .join('courses', 'enrollments.course_id', 'courses.id')
@@ -90,7 +90,7 @@ router.get('/enrollments', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/enroll', verifyToken, async (req, res) => {
+router.post('/enroll', verifyToken, requirePermission('hr', 'read'), async (req, res) => {
   try {
     const { courseId } = req.body;
     if (!courseId) return res.status(400).json({ error: 'courseId is required' });
@@ -114,7 +114,7 @@ router.post('/enroll', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/enrollments/:id/progress', verifyToken, requireRole('hr'), async (req, res) => {
+router.put('/enrollments/:id/progress', verifyToken, requirePermission('hr', 'update'), async (req, res) => {
   try {
     const { status, score } = req.body;
     await db('enrollments').where({ id: req.params.id }).update({

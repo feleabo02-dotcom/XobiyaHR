@@ -178,6 +178,9 @@ exports.seed = async function (knex) {
   addPerms('employee', [
     { module: 'hr', action: 'read' },
     { module: 'attendance', action: 'read' },
+    { module: 'attendance', action: 'create' },
+    { module: 'attendance', action: 'update' },
+    { module: 'attendance', action: 'delete' },
   ]);
   addPerms('project_manager', [
     { module: 'projects', action: 'read' },
@@ -380,9 +383,9 @@ exports.seed = async function (knex) {
 
   // Payroll results
   await knex('payroll_results').insert([
-    { worker_id: 1, payroll_period_id: 1, gross_pay: 16666.67, deductions: 4333.33, net_pay: 12333.34, employer_tax: 3333.33, employer_benefits: 1500.00, currency: 'USD', status: 'paid', company_id: companyId },
-    { worker_id: 2, payroll_period_id: 1, gross_pay: 10416.67, deductions: 2604.17, net_pay: 7812.50, employer_tax: 2083.33, employer_benefits: 1200.00, currency: 'USD', status: 'paid', company_id: companyId },
-    { worker_id: 3, payroll_period_id: 1, gross_pay: 7916.67, deductions: 1979.17, net_pay: 5937.50, employer_tax: 1583.33, employer_benefits: 1000.00, currency: 'USD', status: 'paid', company_id: companyId },
+    { id: 1, worker_id: 1, payroll_period_id: 1, gross_pay: 16666.67, deductions: 4333.33, net_pay: 12333.34, employer_tax: 3333.33, employer_benefits: 1500.00, currency: 'USD', status: 'paid', company_id: companyId },
+    { id: 2, worker_id: 2, payroll_period_id: 1, gross_pay: 10416.67, deductions: 2604.17, net_pay: 7812.50, employer_tax: 2083.33, employer_benefits: 1200.00, currency: 'USD', status: 'paid', company_id: companyId },
+    { id: 3, worker_id: 3, payroll_period_id: 1, gross_pay: 7916.67, deductions: 1979.17, net_pay: 5937.50, employer_tax: 1583.33, employer_benefits: 1000.00, currency: 'USD', status: 'paid', company_id: companyId },
   ]);
 
   // Payroll journal entries

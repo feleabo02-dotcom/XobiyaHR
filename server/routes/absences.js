@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('attendance', 'read'), async (req, res) => {
   try {
     let query = db('absences')
       .join('workers', 'absences.worker_id', 'workers.id')
@@ -46,7 +46,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('attendance', 'create'), async (req, res) => {
   try {
     const { absenceTypeId, startDate, endDate, reason } = req.body;
     if (!absenceTypeId || !startDate || !endDate) {
@@ -88,7 +88,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id/status', verifyToken, requireRole('hr', 'manager'), async (req, res) => {
+router.put('/:id/status', verifyToken, requirePermission('attendance', 'approve'), async (req, res) => {
   try {
     const { status } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -121,7 +121,7 @@ router.put('/:id/status', verifyToken, requireRole('hr', 'manager'), async (req,
   }
 });
 
-router.put('/:id/cancel', verifyToken, async (req, res) => {
+router.put('/:id/cancel', verifyToken, requirePermission('attendance', 'update'), async (req, res) => {
   try {
     const absence = await db('absences')
       .join('workers', 'absences.worker_id', 'workers.id')
@@ -149,7 +149,7 @@ router.put('/:id/cancel', verifyToken, async (req, res) => {
 });
 
 // Get absence types
-router.get('/types', verifyToken, async (req, res) => {
+router.get('/types', verifyToken, requirePermission('attendance', 'read'), async (req, res) => {
   try {
     const types = await db('absence_types').where({ company_id: req.companyId }).orderBy('label');
     res.json(types.map(t => ({
@@ -168,7 +168,7 @@ router.get('/types', verifyToken, async (req, res) => {
 });
 
 // Get leave balances for current user
-router.get('/balances', verifyToken, async (req, res) => {
+router.get('/balances', verifyToken, requirePermission('attendance', 'read'), async (req, res) => {
   try {
     const worker = await db('workers').where({ user_id: req.user.id, company_id: req.companyId }).first();
     if (!worker) return res.json([]);
